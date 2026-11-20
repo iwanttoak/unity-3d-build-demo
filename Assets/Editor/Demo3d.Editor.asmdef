@@ -1,0 +1,20 @@
+{
+    "name": "Demo3d.Editor",
+    "rootNamespace": "Demo3d.EditorTools",
+    "references": [
+        "Demo3d.Runtime",
+        "UnityEngine.UI",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
