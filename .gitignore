@@ -43,3 +43,6 @@ desktop.ini
 
 # --- keep docs/evidence ---
 !/Docs/evidence/
+
+# 过程文档与验收证据：本地保留，不进仓库
+/Docs/
