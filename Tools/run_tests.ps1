@@ -1,8 +1,11 @@
-﻿# 一键跑 EditMode 测试并落存证（走 AIBridge，不关 Editor）
-# 用法: & Tools\run_tests.ps1 [-Filter V1_V8] [-Mode editor]
+﻿# 跑 EditMode 测试并落存证（走 AIBridge，不关 Editor）
+# 用异步模式 + 轮询 test_status：同步模式会在跑测试期间长期占用 Editor 的命令队列，
+# 一旦测试卡住，后续所有命令都会跟着排队超时。异步模式把「等待」放到客户端。
+# 用法: & Tools\run_tests.ps1 [-Filter V1_V8] [-Mode editor] [-TimeoutSec 180]
 param(
     [string]$Filter = '',
     [string]$Mode = 'editor',
+    [int]$TimeoutSec = 180,
     [string]$Evidence = 'Docs\evidence\editmode_tests.json'
 )
 
@@ -10,27 +13,53 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $bridge = Join-Path $root 'Tools\unity_bridge.ps1'
 
-# 等编译完成后才能跑测试
-if (Test-Path (Join-Path $root 'Library\Pipeline\.unity-pipeline-port')) {
-    & $bridge -Action status | Out-Null
+function CB {
+    param([hashtable]$P)
+    for ($i = 0; $i -lt 20; $i++) {
+        try { return ((& $bridge @P) | ConvertFrom-Json) } catch { Start-Sleep -Milliseconds 800 }
+    }
+    throw "bridge 调用失败: $($P['Command'])"
 }
 
-$params = @{ mode = $Mode; timeout = 300 }
+function Parse([object]$value) {
+    if ($value -is [string]) { return ($value | ConvertFrom-Json) }
+    return $value
+}
+
+$params = @{ mode = $Mode; async_tests = $true; timeout = $TimeoutSec }
 if ($Filter) { $params.filter = $Filter; $params.filter_type = 'testName' }
 $paramsJson = $params | ConvertTo-Json -Compress
 
-$raw = & $bridge -Action exec -Command run_tests -ParamsJson $paramsJson
-$j = $raw | ConvertFrom-Json
-$res = $j.result
-if ($res -is [string]) { $res = $res | ConvertFrom-Json }
+$start = CB @{ Action = 'exec'; Command = 'run_tests'; ParamsJson = $paramsJson }
+Write-Host "已提交测试（异步）: $((Parse $start.result).result)"
+
+$status = $null
+$deadline = (Get-Date).AddSeconds($TimeoutSec + 30)
+while ((Get-Date) -lt $deadline) {
+    Start-Sleep -Seconds 2
+    $resp = CB @{ Action = 'exec'; Command = 'test_status' }
+    $s = Parse $resp.result
+    $status = $s.status
+    if ($status -in @('completed', 'failed', 'canceled', 'cancelled')) {
+        $result = $s
+        break
+    }
+    Write-Host "    ... $status"
+}
+
+if (-not $result) {
+    Write-Host "RESULT: FAIL —— 等待测试超时（$status）"
+    exit 2
+}
 
 $out = Join-Path $root $Evidence
-$raw | Set-Content -LiteralPath $out -Encoding UTF8
+($result | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $out -Encoding UTF8
 
+$sum = $result.summary
 Write-Host ("Total={0} Passed={1} Failed={2} Skipped={3} Duration={4}s" -f `
-        $res.Summary.Total, $res.Summary.Passed, $res.Summary.Failed, $res.Summary.Skipped, $res.Duration)
-$res.Results | Select-Object Status, FullName, Message | Format-Table -AutoSize -Wrap | Out-String -Width 200 | Write-Host
+        $sum.total, $sum.passed, $sum.failed, $sum.skipped, $result.duration)
+$result.results | Select-Object Status, FullName, Message | Format-Table -AutoSize -Wrap | Out-String -Width 200 | Write-Host
 Write-Host "存证: $out"
 
-if ($res.Summary.Failed -gt 0) { exit 2 }
+if ($sum.failed -gt 0) { exit 2 }
 exit 0
