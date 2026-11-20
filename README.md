@@ -53,6 +53,10 @@
 
 # ④ V1–V8 全流程验收：逐步截图 + 生成报告
 & Tools\run_acceptance.ps1
+
+# ⑤（可选）把文档导出成 Word
+python Tools\md2docx.py Docs\提交信息表.md Docs\提交信息表.docx
+python Tools\md2docx.py Docs\提示词记录.md Docs\提示词记录.docx
 ```
 
 全都退出码 `0` 即代表通过。产物固定落到 `Docs/evidence/`：
@@ -104,6 +108,8 @@ Docs/                              ← 过程文档与证据
 ├─ 需求分析与任务拆解.md            需求还原、规则值、V1–V8 映射、T0–T9 拆解
 ├─ T0…T5_*.md                      各阶段实现说明与验证记录
 ├─ 提示词记录.md                    ★ 提交要求：逐轮提示词与关键过程（含真实返工）
+├─ 提示词记录.docx                  ↑ 的 Word 版（可直接提交）
+├─ 提交信息表.md / .docx            提交前要填的信息汇总（A 表填完即可交）
 ├─ 进度看板.md                      T0–T9 状态与可用命令
 ├─ AIBridge通道.md                  Editor 桥接的端点与命令清单
 ├─ exam_requirements_raw.txt        PDF 原文提取留档
