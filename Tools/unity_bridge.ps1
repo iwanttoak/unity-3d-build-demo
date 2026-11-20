@@ -30,7 +30,10 @@ function Invoke-UnityApi {
     param([string]$UrlPath, [string]$Method = 'GET', [string]$Body = $null)
     try {
         if ($Method -eq 'POST') {
-            $r = Invoke-WebRequest -Uri "$base$UrlPath" -Method POST -Headers $headers -Body $Body -TimeoutSec 600 -UseBasicParsing
+            # 必须显式转成 UTF-8 字节：PS 5.1 的 -Body 字符串默认按 Latin-1 发送，
+            # 含中文（如截图文件名、中文提示）时服务端会解析失败并返回 400。
+            $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($Body)
+            $r = Invoke-WebRequest -Uri "$base$UrlPath" -Method POST -Headers $headers -Body $bodyBytes -TimeoutSec 600 -UseBasicParsing
         } else {
             $r = Invoke-WebRequest -Uri "$base$UrlPath" -Method GET -Headers $headers -TimeoutSec 600 -UseBasicParsing
         }

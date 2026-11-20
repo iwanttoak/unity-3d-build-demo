@@ -13,7 +13,7 @@ $evidence = Join-Path $root 'Docs\evidence'
 function CB {
     param([hashtable]$P)
     for ($i = 0; $i -lt 40; $i++) {
-        try { return (& $bridge @P) } catch { Start-Sleep -Milliseconds 1200 }
+        try { return ((& $bridge @P) | ConvertFrom-Json) } catch { Start-Sleep -Milliseconds 1200 }
     }
     throw "bridge 调用失败: $($P['Action'])"
 }
@@ -34,7 +34,7 @@ function Wait-PlayMode([string]$target, [int]$tries = 30) {
 
 function Enter-PlayMode([int]$tries = 10) {
     for ($i = 0; $i -lt $tries; $i++) {
-        $j = (CB @{ Action = 'exec'; Command = 'editor_play' }) | ConvertFrom-Json
+        $j = CB @{ Action = 'exec'; Command = 'editor_play' }
         if ($j.result -eq 'Already in play mode' -or (Get-PlayMode) -eq 'playing') { return $true }
         if ($j.error) { Write-Host "    editor_play 重试: $($j.errorDetails)" }
         Start-Sleep -Seconds 2
@@ -44,8 +44,8 @@ function Enter-PlayMode([int]$tries = 10) {
 
 function Invoke-Probe([string]$label, [string]$file) {
     $r = CB @{ Action = 'eval'; Command = 'return Demo3d.Diagnostics.BuildFlowProbe.Run();' }
-    $j = $r | ConvertFrom-Json
-    $res = $j.result
+    $res = $r.result
+    if ($res -is [string]) { $res = $res | ConvertFrom-Json }
     $text = $res.result
     if (-not $text) {
         Write-Host "[$label] eval 失败: $($res.error) $($res.errorDetails)"
@@ -61,8 +61,8 @@ function Invoke-Probe([string]$label, [string]$file) {
 
 function Invoke-HudProbe([string]$label, [string]$file) {
     $r = CB @{ Action = 'eval'; Command = 'return Demo3d.Diagnostics.HudProbe.Run();' }
-    $j = $r | ConvertFrom-Json
-    $res = $j.result
+    $res = $r.result
+    if ($res -is [string]) { $res = $res | ConvertFrom-Json }
     $text = $res.result
     if (-not $text) {
         Write-Host "[$label] eval 失败: $($res.error) $($res.errorDetails)"
@@ -76,7 +76,24 @@ function Invoke-HudProbe([string]$label, [string]$file) {
     return ($fails.Count -eq 0)
 }
 
-$ok = Invoke-Probe 'EditMode' 't3_buildflow_probe.txt'
+function Ensure-Scene {
+    # 跑完测试/退出播放后，Unity 可能短暂处于「场景正在重载」状态，
+    # 这时 FindFirstObjectByType 会返回 null。缺对象就重建一次再继续。
+    for ($i = 0; $i -lt 3; $i++) {
+        $r = CB @{ Action = 'eval'; Command = 'var c = UnityEngine.Object.FindFirstObjectByType<Demo3d.BuildController>(); return c == null ? "missing" : "ok";' }
+        $res = $r.result
+        if ($res -is [string]) { $res = $res | ConvertFrom-Json }
+        if ($res.result -eq 'ok') { return $true }
+        Write-Host "    场景缺少 BuildController，重建场景（第 $($i + 1) 次）"
+        CB @{ Action = 'eval'; Command = 'return Demo3d.EditorTools.Demo3dSceneBuilder.BuildScene();' } | Out-Null
+        CB @{ Action = 'exec'; Command = 'save_scene' } | Out-Null
+        Start-Sleep -Seconds 2
+    }
+    return $false
+}
+
+$ok = Ensure-Scene
+$ok = (Invoke-Probe 'EditMode' 't3_buildflow_probe.txt') -and $ok
 
 if (-not $SkipPlay) {
     CB @{ Action = 'exec'; Command = 'save_scene' } | Out-Null
@@ -99,7 +116,7 @@ return c.Coins + "|" + c.BuildingCount;
 
         # 合成画面（含 Overlay HUD，仅 Play Mode 可得）
         $uiShot = @{ width = 1280; height = 720; source = 'screen'; save_path = 'Docs/evidence/t4_hud_normal.png' } | ConvertTo-Json -Compress
-        $saved = ((CB @{ Action = 'exec'; Command = 'capture_game_view'; ParamsJson = $uiShot }) | ConvertFrom-Json).result
+        $saved = (CB @{ Action = 'exec'; Command = 'capture_game_view'; ParamsJson = $uiShot }).result
         if ($saved -is [string]) { $saved = $saved | ConvertFrom-Json }
         Write-Host "[Screenshot] $($saved.savedPath)"
 
