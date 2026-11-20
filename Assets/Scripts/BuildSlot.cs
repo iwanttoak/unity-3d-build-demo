@@ -123,6 +123,19 @@ namespace Demo3d
             Repaint();
         }
 
+#if UNITY_EDITOR
+        /// <summary>编辑期改参数/加载场景时也刷新配色，免得 Scene 视图里看到的和运行期不一致。</summary>
+        private void OnValidate()
+        {
+            if (m_Body == null)
+            {
+                m_Body = GetComponentInChildren<Renderer>();
+            }
+
+            Repaint();
+        }
+#endif
+
         private void Repaint()
         {
             var body = m_Body != null ? m_Body : GetComponentInChildren<Renderer>();
