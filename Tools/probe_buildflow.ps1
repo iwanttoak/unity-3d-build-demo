@@ -59,6 +59,23 @@ function Invoke-Probe([string]$label, [string]$file) {
     return ($fails.Count -eq 0)
 }
 
+function Invoke-HudProbe([string]$label, [string]$file) {
+    $r = CB @{ Action = 'eval'; Command = 'return Demo3d.Diagnostics.HudProbe.Run();' }
+    $j = $r | ConvertFrom-Json
+    $res = $j.result
+    $text = $res.result
+    if (-not $text) {
+        Write-Host "[$label] eval 失败: $($res.error) $($res.errorDetails)"
+        return $false
+    }
+    $text | Set-Content -LiteralPath (Join-Path $evidence $file) -Encoding UTF8
+    $summary = ($text -split "`r?`n") | Where-Object { $_ -match 'RESULT' }
+    $fails = ($text -split "`r?`n") | Where-Object { $_ -match '^FAIL' }
+    Write-Host "[$label] $summary"
+    $fails | ForEach-Object { Write-Host "    $_" }
+    return ($fails.Count -eq 0)
+}
+
 $ok = Invoke-Probe 'EditMode' 't3_buildflow_probe.txt'
 
 if (-not $SkipPlay) {
@@ -66,6 +83,7 @@ if (-not $SkipPlay) {
     if (-not (Enter-PlayMode)) { throw '进入 Play Mode 超时' }
     Start-Sleep -Seconds 2
     $ok = (Invoke-Probe 'PlayMode' 't3_buildflow_probe_playmode.txt') -and $ok
+    $ok = (Invoke-HudProbe 'HUD' 't4_hud_probe.txt') -and $ok
 
     if (-not $SkipScreenshot) {
         $demo = @'
@@ -74,10 +92,25 @@ c.Restart(); c.SelectSlot(0); c.Build(); c.SelectSlot(2); c.Build(); c.SelectSlo
 return c.Coins + "|" + c.BuildingCount;
 '@
         (CB @{ Action = 'eval'; Command = $demo }) | Out-Null
+
+        # 纯 3D 视角（不含 UI）
         $shot = @{ view = 'game'; output = (Join-Path $evidence 't3_built_playmode.png'); width = 1280; height = 720 } | ConvertTo-Json -Compress
-        $saved = (CB @{ Action = 'exec'; Command = 'screenshot'; ParamsJson = $shot }).result
+        (CB @{ Action = 'exec'; Command = 'screenshot'; ParamsJson = $shot }) | Out-Null
+
+        # 合成画面（含 Overlay HUD，仅 Play Mode 可得）
+        $uiShot = @{ width = 1280; height = 720; source = 'screen'; save_path = 'Docs/evidence/t4_hud_normal.png' } | ConvertTo-Json -Compress
+        $saved = ((CB @{ Action = 'exec'; Command = 'capture_game_view'; ParamsJson = $uiShot }) | ConvertFrom-Json).result
         if ($saved -is [string]) { $saved = $saved | ConvertFrom-Json }
-        Write-Host "[Screenshot] $($saved.path)"
+        Write-Host "[Screenshot] $($saved.savedPath)"
+
+        # capture_game_view 的 save_path 会被解析到 Assets/ 下，这里挪回 Docs/evidence 并清理
+        $tmpDir = Join-Path $root 'Assets\Docs\evidence'
+        if (Test-Path $tmpDir) {
+            Get-ChildItem $tmpDir -Filter *.png | ForEach-Object { Move-Item -LiteralPath $_.FullName -Destination (Join-Path $evidence $_.Name) -Force }
+        }
+        if (Test-Path (Join-Path $root 'Assets\Docs')) { Remove-Item -LiteralPath (Join-Path $root 'Assets\Docs') -Recurse -Force }
+        if (Test-Path (Join-Path $root 'Assets\Docs.meta')) { Remove-Item -LiteralPath (Join-Path $root 'Assets\Docs.meta') -Force }
+        Write-Host "[Screenshot] 已归档到 Docs/evidence"
     }
 
     CB @{ Action = 'exec'; Command = 'editor_stop' } | Out-Null

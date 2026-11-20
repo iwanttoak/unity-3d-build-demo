@@ -79,6 +79,18 @@ namespace Demo3d
             }
         }
 
+        public int SlotCount
+        {
+            get
+            {
+                EnsureInitialized();
+                return m_Model.SlotCount;
+            }
+        }
+
+        /// <summary>上一次操作是否失败（HUD 用它决定文案配色）。</summary>
+        public bool LastOperationFailed { get; private set; }
+
         public bool HasSelection
         {
             get
@@ -204,6 +216,7 @@ namespace Demo3d
             StatusMessage = slot.Index == m_Model.SelectedIndex
                 ? $"格子 {slot.Label} 已选中"
                 : $"已选中格子 {slot.Label}";
+            LastOperationFailed = false;
             m_Model.Select(slot.Index);
             Notify(); // Select 内部已触发 SyncVisuals，这里只补一次 UI 刷新（含新文案）
         }
@@ -227,6 +240,7 @@ namespace Demo3d
             EnsureInitialized();
             var outcome = m_Model.TryBuildSelected();
             StatusMessage = Describe(outcome);
+            LastOperationFailed = outcome != BuildOutcome.Success;
             Notify();
         }
 
@@ -235,6 +249,7 @@ namespace Demo3d
             EnsureInitialized();
             var outcome = m_Model.TryDemolishSelected();
             StatusMessage = Describe(outcome);
+            LastOperationFailed = outcome != DemolishOutcome.Success;
             Notify();
         }
 
@@ -247,6 +262,7 @@ namespace Demo3d
             EnsureInitialized();
             m_Model.Restart(Mathf.Max(0, m_InitialCoins), Mathf.Max(1, m_BuildCost));
             StatusMessage = "已重新开始";
+            LastOperationFailed = false;
             Notify();
         }
 
