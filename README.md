@@ -2,6 +2,8 @@
 
 一块地面、四个固定建造位（A–D）、一种建筑 Prefab；鼠标点格子选中，UI 显示金币与选中格状态，提供建造 / 拆除 / 重新开始三个按钮。
 
+仓库地址：https://github.com/iwanttoak/unity-3d-build-demo
+
 **当前状态**
 
 | 项目 | 结果 |
