@@ -46,3 +46,6 @@ desktop.ini
 
 # 过程文档与验收证据：本地保留，不进仓库
 /Docs/
+
+# 打包会话记录时的临时目录
+/_thinking_stage/
