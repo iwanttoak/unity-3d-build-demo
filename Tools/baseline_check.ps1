@@ -1,4 +1,4 @@
-# T0 基线自检：验证工程事实与目录/程序集骨架是否就位
+﻿# T0 基线自检：验证工程事实与目录/程序集骨架是否就位
 # 用法: pwsh -File Tools\baseline_check.ps1
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)

@@ -1,4 +1,4 @@
-# 编译门禁：从 Unity Editor.log 里抓本次会话的 C# 编译错误/警告
+﻿# 编译门禁：从 Unity Editor.log 里抓本次会话的 C# 编译错误/警告
 # 用法: pwsh -File Tools\check_unity_log.ps1            # 看最近 600 行
 #       pwsh -File Tools\check_unity_log.ps1 -All       # 看整个日志文件
 # 退出码: 0 = 无编译错误, 2 = 发现 error CS / 编译失败
