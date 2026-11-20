@@ -34,13 +34,17 @@ function Invoke-UnityApi {
         } else {
             $r = Invoke-WebRequest -Uri "$base$UrlPath" -Method GET -Headers $headers -TimeoutSec 600 -UseBasicParsing
         }
-        return ($r.Content | ConvertFrom-Json)
+        # 服务端未声明 charset 时 PS 5.1 会按 ISO-8859-1 解码，中文会乱码；
+        # 这里统一按 UTF-8 重新解码原始字节。
+        $bytes = $r.RawContentStream.ToArray()
+        $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+        return ($text | ConvertFrom-Json)
     } catch {
         $resp = $_.Exception.Response
         if ($resp) {
-            $sr = New-Object System.IO.StreamReader($resp.GetResponseStream())
-            $body = $sr.ReadToEnd()
-            throw "HTTP $([int]$resp.StatusCode) on $UrlPath :: $body"
+            $sr = New-Object System.IO.StreamReader($resp.GetResponseStream(), [System.Text.Encoding]::UTF8)
+            $bodyText = $sr.ReadToEnd()
+            throw "HTTP $([int]$resp.StatusCode) on $UrlPath :: $bodyText"
         }
         throw
     }
